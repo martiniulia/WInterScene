@@ -1,9 +1,10 @@
-#version 410 core
+#version 330 core
 
-out vec4 fColor;
+out vec4 FragColor;
 
-void main() 
-{    
-    // Culoare galben strălucitor pentru a marca poziția luminii
-    fColor = vec4(1.0f, 1.0f, 0.0f, 1.0f); // Galben
+uniform vec3 objectColor; // culoarea cubului (galben cald)
+
+void main()
+{
+    FragColor = vec4(objectColor, 1.0); // culoare pura, fara iluminare
 }

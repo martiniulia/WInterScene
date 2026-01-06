@@ -19,8 +19,8 @@
 #include "Model3D.hpp"
 
 // Dimensiuni fereastra
-int glWindowWidth = 1200;
-int glWindowHeight = 800;
+int glWindowWidth = 1024;
+int glWindowHeight = 768;
 int retina_width, retina_height;
 GLFWwindow* glWindow = NULL;
 
@@ -52,12 +52,12 @@ glm::vec3 spotLightDir(0.0f, -1.0f, 0.0f);  // în jos
 
 // Coordonate felinare din Blender
 std::vector<glm::vec3> pointLightPositions = {
-    {2.21f, -2.72f, 0.42f},   // felinar 1
-    {2.50f, -2.66f, 0.42f},   // felinar 2
-    {2.43f, -3.57f, 0.14f},   // felinar 3
-    {2.71f, -3.49f, 0.11f},   // felinar 4
-    {2.00f, -1.88f, 0.10f},   // felinar 5
-    {2.28f, -1.81f, 0.10f}    // felinar 6
+    {2.22f, 0.42f, 2.72f},   // felinar 1
+    {2.50f, 0.42f, 2.66f},   // felinar 2
+    {2.43f, 0.10f, 3.57f},   // felinar 3
+    {2.71f, 0.11f, 3.57f},   // felinar 4
+    {2.00f, 0.10f, 1.88f},   // felinar 5
+    {2.28f, 0.10f, 1.81f}    // felinar 6
 };
 
 // Culori felinare (cald, portocaliu/galben)
@@ -76,12 +76,9 @@ float cameraSpeed = 3.0f;
 // Input
 bool pressedKeys[1024];
 float angle = 0.0f;
-float lightAngle = 0.0f; // Unghi pentru rotația luminii
-glm::vec3 lightDir(0.0f, 1.0f, 1.0f); // Directia initiala a luminii
 
-// Rendering modes
-int renderMode = 0; // 0 = NORMAL, 1 = LINES, 2 = POINTS, 3 = SMOOTH
-GLuint smoothModeLoc; // uniform pentru smooth/flat shading
+// View modes
+int viewMode = 0; // 0 = FILL, 1 = WIREFRAME, 2 = SMOOTH
 
 // Object transformations
 float objectScale = 1.0f;
@@ -92,11 +89,25 @@ float objectRotation = 0.0f;
 float animationTime = 0.0f;
 float doorRotation = 0.0f; // Pentru animație ușă (exemplu)
 
+// Light rotation
+float lightAngle = 0.0f;
+
+enum ViewMode {
+    VIEW_SOLID = 0,
+    VIEW_WIREFRAME,
+    VIEW_POLYGONAL,
+    VIEW_SMOOTH
+};
+
+ViewMode currentViewMode = VIEW_SOLID;
+
 // Resurse (Laboratorul 8)
 gps::Model3D myModel;
+gps::Model3D lightCube;
 gps::Shader myCustomShader;
 gps::Shader depthMapShader;
 gps::Shader lightCubeShader;
+gps::Shader lightGlowShader;
 
 // Shadow mapping
 const unsigned int SHADOW_WIDTH = 2048;
@@ -104,12 +115,6 @@ const unsigned int SHADOW_HEIGHT = 2048;
 GLuint shadowMapFBO;
 GLuint depthMapTexture;
 glm::mat4 lightSpaceTrMatrix;
-
-// Cub pentru a marca poziția luminii (test)
-GLuint lightCubeVAO;
-GLuint lightCubeVBO;
-GLuint lightCubeEBO;
-glm::vec3 lightTestPosition = glm::vec3(-0.15f, 2.9f, 1.7f); // Coordonate pentru test
 
 // Fog parameters
 float fogDensity = 0.035f; // Mărit pentru vizibilitate mai bună
@@ -171,32 +176,36 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 void processMovement(float deltaTime) {
     float speed = cameraSpeed * deltaTime;
 
-    // Rendering mode controls
+    // View modes: V = SOLID, M = WIREFRAME, N = POLYGONAL, B = SMOOTH
     if (pressedKeys[GLFW_KEY_V]) {
-        renderMode = 0; // NORMAL
-        pressedKeys[GLFW_KEY_V] = false;
-    }
-    if (pressedKeys[GLFW_KEY_B]) {
-        renderMode = 1; // LINES
-        pressedKeys[GLFW_KEY_B] = false;
-    }
-    if (pressedKeys[GLFW_KEY_N]) {
-        renderMode = 2; // POINTS
-        pressedKeys[GLFW_KEY_N] = false;
+        currentViewMode = VIEW_SOLID;
     }
     if (pressedKeys[GLFW_KEY_M]) {
-        renderMode = 3; // SMOOTH
-        pressedKeys[GLFW_KEY_M] = false;
+        currentViewMode = VIEW_WIREFRAME;
+    }
+    if (pressedKeys[GLFW_KEY_N]) {
+        currentViewMode = VIEW_POLYGONAL;
+    }
+    if (pressedKeys[GLFW_KEY_B]) {
+        currentViewMode = VIEW_SMOOTH;
     }
 
-    // Rendering modes: M = Wireframe, N = Fill, B = Smooth (legacy controls)
-    if (pressedKeys[GLFW_KEY_M])
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    if (pressedKeys[GLFW_KEY_N])
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    if (pressedKeys[GLFW_KEY_B]) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glShadeModel(GL_SMOOTH);
+    // Apply current view mode
+    switch (currentViewMode) {
+        case VIEW_SOLID:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            glDisable(GL_PROGRAM_POINT_SIZE);
+            break;
+        case VIEW_WIREFRAME:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            break;
+        case VIEW_POLYGONAL:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+            glEnable(GL_PROGRAM_POINT_SIZE);
+            break;
+        case VIEW_SMOOTH:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            break;
     }
 
     // Scene rotation
@@ -218,12 +227,11 @@ void processMovement(float deltaTime) {
         objectScale += 0.01f;
         objectScale = glm::min(objectScale, 2.0f);
     }
-    // Light rotation controls (J/L pentru mișcarea luminii)
     if (pressedKeys[GLFW_KEY_J]) {
-        lightAngle -= 1.0f;
+        lightAngle += 1.0f; // Rotate light left
     }
     if (pressedKeys[GLFW_KEY_L]) {
-        lightAngle += 1.0f;
+        lightAngle -= 1.0f; // Rotate light right
     }
     if (pressedKeys[GLFW_KEY_W]) {
         myCamera.move(gps::MOVE_FORWARD, speed);
@@ -260,7 +268,7 @@ bool initOpenGLWindow() {
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    glWindow = glfwCreateWindow(glWindowWidth, glWindowHeight, "OpenGL Project - Winter Scene", NULL, NULL);
+    glWindow = glfwCreateWindow(glWindowWidth, glWindowHeight, "Proiect OpenGL - Scena Iarna", NULL, NULL);
 
     if (!glWindow) {
         fprintf(stderr, "ERROR: could not open window with GLFW3\n");
@@ -321,19 +329,17 @@ void initFBO() {
 }
 
 glm::mat4 computeLightSpaceTrMatrix() {
+    // Ca in lab9 - folosim rotirea luminii
+    glm::vec3 lightDir = glm::vec3(0.0f, 1.0f, 1.0f);
     glm::mat4 lightRotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::vec3 rotatedLightDir = glm::vec3(lightRotationMatrix * glm::vec4(lightDir, 0.0f));
 
-    glm::vec3 lightPos = rotatedLightDir; // Redus de la 15.0f la 5.0f
+    glm::vec3 lightPos = rotatedLightDir; // Pozitionam lumina undeva pe directie
     glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
-
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    if (abs(rotatedLightDir.y) > 0.9f) {
-        up = glm::vec3(0.0f, 0.0f, 1.0f);
-    }
 
     glm::mat4 lightView = glm::lookAt(lightPos, target, up);
-    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.0f); // Redus frustum-ul
+    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.0f);
 
     return lightProjection * lightView;
 }
@@ -368,17 +374,13 @@ void renderScene(float deltaTime) {
 
     myCustomShader.useShaderProgram();
 
-    // Directional light - rotit cu lightAngle
-    glm::vec3 lightDir(0.0f, 1.0f, 1.0f);
+    // Directional light (soare) - ca in lab9
+    glm::vec3 lightDir = glm::vec3(0.0f, 1.0f, 1.0f); // directia initiala
     glm::mat4 lightRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::vec3 rotatedLightDir = glm::normalize(glm::vec3(lightRotation * glm::vec4(lightDir, 0.0f)));
+    glm::vec3 rotatedLightDir = glm::vec3(lightRotation * glm::vec4(lightDir, 0.0f));
+    glm::vec3 lightColor(1.0f, 1.0f, 1.0f); // lumina alba ca in lab9
 
-    // Transforma directia in view space pentru shader
-    glm::vec3 lightDirViewSpace = glm::normalize(glm::inverseTranspose(glm::mat3(view)) * rotatedLightDir);
-
-    glm::vec3 lightColor(1.0f, 0.95f, 0.9f); // lumina calda de soare
-
-    glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightDir"), 1, glm::value_ptr(lightDirViewSpace));
+    glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightDir"), 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * lightRotation)) * lightDir));
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightColor"), 1, glm::value_ptr(lightColor));
 
     // Trimite point lights (felinarele) la shader
@@ -405,15 +407,6 @@ void renderScene(float deltaTime) {
     view = myCamera.getViewMatrix();
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-    // Send normal matrix
-    glm::mat3 normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
-    GLuint normalMatrixLoc = glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix");
-    glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-
-    // Shading mode (0 = flat, 1 = smooth)
-    smoothModeLoc = glGetUniformLocation(myCustomShader.shaderProgram, "shadingMode");
-    glUniform1i(smoothModeLoc, 0); // default flat
-
     // Send camera position for fog
     glm::vec3 cameraPos = myCamera.getPosition();
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "viewPos"), 1, glm::value_ptr(cameraPos));
@@ -422,6 +415,9 @@ void renderScene(float deltaTime) {
     glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, "fogDensity"), fogDensity);
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "fogColor"), 1, glm::value_ptr(fogColor));
 
+    // Send smooth shading flag
+    glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "isSmooth"), currentViewMode == VIEW_SMOOTH);
+
     // Object transformations (scale, translate, rotate)
     model = glm::mat4(1.0f);
     model = glm::translate(model, objectTranslate);
@@ -429,47 +425,54 @@ void renderScene(float deltaTime) {
     model = glm::scale(model, glm::vec3(objectScale));
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
+    // Calculate and send normal matrix after model is set
+    glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(view * model));
+    glUniformMatrix3fv(glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
     // Animation update
     animationTime += deltaTime;
     doorRotation = sin(animationTime * 0.5f) * 45.0f; // Oscilatie ușă exemplu (poți folosi pentru componente individuale)
 
-    // Apply rendering mode
-    switch (renderMode) {
-    case 0: // NORMAL
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glUniform1i(smoothModeLoc, 0); // flat shading
-        break;
-    case 1: // LINES
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glUniform1i(smoothModeLoc, 0); // flat shading
-        break;
-    case 2: // POINTS
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glUniform1i(smoothModeLoc, 0); // flat shading
-        break;
-    case 3: // SMOOTH
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glUniform1i(smoothModeLoc, 1); // smooth shading
-        break;
-    }
-
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     myModel.Draw(myCustomShader);
-    
-    // Desenăm cubul de test pentru poziția luminii
+
+    // Draw light cube
     lightCubeShader.useShaderProgram();
-    glm::mat4 lightCubeModel = glm::mat4(1.0f);
-    lightCubeModel = glm::translate(lightCubeModel, lightTestPosition);
-    lightCubeModel = glm::scale(lightCubeModel, glm::vec3(2.0f, 2.0f, 2.0f)); // Cub de 2x2x2 unități
     
-    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(lightCubeModel));
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     
-    glBindVertexArray(lightCubeVAO);
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+    model = lightRotation;
+    model = glm::translate(model, 5.0f * lightDir);
+    model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
+    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+    
+    lightCube.Draw(lightCubeShader);
+
+    // Dimensiune cub pentru felinare
+    float lightCubeSize = 0.025f; // cub mic
+
+    // Setam shader-ul cuburilor de lumina
+    lightCubeShader.useShaderProgram();
+
+    // Trimitem view si projection
+    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    for (int i = 0; i < pointLightPositions.size() && i < 8; i++) {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, pointLightPositions[i]); // pozitia felinarului
+        model = glm::scale(model, glm::vec3(lightCubeSize));  // cub mic
+        glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+
+        // culoare galben cald
+        glm::vec3 color = pointLightColors[i] * 0.3f; // reduc intensitatea daca vrei mai subtil
+        glUniform3fv(glGetUniformLocation(lightCubeShader.shaderProgram, "objectColor"), 1, glm::value_ptr(color));
+
+        lightCube.Draw(lightCubeShader);
+    }
+
 }
 
 
@@ -513,6 +516,7 @@ int main(int argc, const char* argv[]) {
     // Primul argument: calea catre fisierul .obj
     // Al doilea argument: folderul unde sunt texturile (.png)
     myModel.LoadModel("scene.obj", "./");
+    lightCube.LoadModel("cube.obj", "./");
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 

@@ -1,13 +1,14 @@
 #version 410 core
 
-layout(location = 0) in vec3 vPosition;
-layout(location = 1) in vec3 vNormal;
-layout(location = 2) in vec2 vTexCoords;
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec3 vertexNormal;
+layout(location = 2) in vec2 textcoord;
 
-out vec3 fNormal;
+out vec3 Normal;
+out vec2 passTexture;
+out vec3 FragPos;
+out vec4 FragPosLightSpace;
 out vec4 fPosEye;
-out vec2 fTexCoords;
-out vec4 fPosLightSpace;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -17,13 +18,12 @@ uniform mat4 lightSpaceTrMatrix;
 
 void main()
 {
-    //compute eye space coordinates
-    fPosEye = view * model * vec4(vPosition, 1.0f);
-    fNormal = normalize(normalMatrix * vNormal);
-    fTexCoords = vTexCoords;
-    
-    //compute light space coordinates for shadow mapping
-    fPosLightSpace = lightSpaceTrMatrix * model * vec4(vPosition, 1.0f);
-    
-    gl_Position = projection * view * model * vec4(vPosition, 1.0f);
+    fPosEye = view * model * vec4(vertexPosition, 1.0f);
+    FragPos = vec3(model * vec4(vertexPosition, 1.0));
+    FragPosLightSpace = lightSpaceTrMatrix * model * vec4(vertexPosition, 1.0);
+
+    Normal = normalize(normalMatrix * vertexNormal);
+    passTexture = textcoord;
+
+    gl_Position = projection * view * model * vec4(vertexPosition, 1.0);
 }

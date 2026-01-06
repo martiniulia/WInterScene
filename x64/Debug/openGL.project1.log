@@ -1,12 +1,9 @@
 ﻿  main.cpp
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(145,17): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(146,17): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(150,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(151,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(153,13): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(154,13): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(520,28): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-glew32s.lib(glew.obj) : warning LNK4099: PDB '' was not found with 'glew32s.lib(glew.obj)' or at ''; linking object as if no debug info
-LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
-LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(150,17): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(151,17): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(155,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(156,19): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(158,13): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(159,13): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\Maria\Desktop\GP\openGL.project1\openGL.project1\main.cpp(524,28): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
   openGL.project1.vcxproj -> C:\Users\Maria\Desktop\GP\openGL.project1\x64\Debug\openGL.project1.exe
