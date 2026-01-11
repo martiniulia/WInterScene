@@ -66,6 +66,5 @@
     <None Include="shaders\lightSource.vert" />
     <None Include="shaders\lightCube.frag" />
     <None Include="shaders\lightCube.vert" />
-    <None Include="shaders\lightSphere.frag" />
   </ItemGroup>
 </Project>

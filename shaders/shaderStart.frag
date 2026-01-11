@@ -8,18 +8,18 @@ in vec4 fPosEye;
 
 out vec4 fragmentColour;
 
-//texture
+// Texture samplers
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
 
-//lighting
+// Directional light (the Sun)
 uniform vec3 lightDir;
-uniform vec3 lightColor;
+uniform vec3 lightColor; 
 
-//shadow
+// Shadow map
 uniform sampler2D shadowMap;
 
-// fog
+// Fog
 uniform vec3 fogColor;
 uniform float fogDensity;
 
@@ -42,62 +42,51 @@ float shadow;
 
 float computeShadow()
 {
-    // perform perspective divide
     vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
-    
-    // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    
-    // get closest depth value from light's perspective (using [0,1] range FragPosLightSpace as coords)
+
     float closestDepth = texture(shadowMap, projCoords.xy).r;
-    
-    // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    
-    // check if current fragment is in shadow
+
     float bias = 0.010;
     float shadowFactor = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-    
-    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum
+
     if(projCoords.z > 1.0)
         shadowFactor = 0.0;
-    
+
     return shadowFactor;
 }
 
 void computeLightComponents()
 {    
-    vec3 cameraPosEye = vec3(0.0f);//in eye coordinates, the viewer is situated at the origin
-    
-    //transform normal
+    vec3 cameraPosEye = vec3(0.0f); // Viewer in eye space
+
+    // Transform normal
     vec3 normalEye = normalize(Normal);    
     vec3 normal = isSmooth ? normalEye : normalize(cross(dFdx(FragPos), dFdy(FragPos)));
-    
-    //compute light direction
+
+    // Directional light is already in world space
     vec3 lightDirN = normalize(lightDir);
-    
-    //compute view direction 
+
+    // View direction
     vec3 viewDirN = normalize(cameraPosEye - fPosEye.xyz);
-        
-    //compute ambient light
+
+    // Ambient
     ambient = ambientStrength * lightColor;
-    
-    //compute diffuse light - different for smooth vs solid
+
+    // Diffuse and specular
     if (isSmooth) {
-        // SMOOTH - full Phong lighting
         diffuse = max(dot(normal, lightDirN), 0.0f) * lightColor;
-        
-        //compute specular light
+
         vec3 reflection = reflect(-lightDirN, normal);
         float specCoeff = pow(max(dot(viewDirN, reflection), 0.0f), shininess);
         specular = specularStrength * specCoeff * lightColor;
     } else {
-        // SOLID - simple flat shading
         diffuse = max(dot(normal, lightDirN), 0.0f) * lightColor;
-        specular = vec3(0.0f); // No specular for solid mode
+        specular = vec3(0.0);
     }
-    
-    //compute shadow
+
+    // Shadow
     shadow = computeShadow();
 }
 
@@ -108,42 +97,42 @@ void main()
         discard;
 
     computeLightComponents();
-    
-    // Apply texture to lighting components
+
+    // Apply texture to directional light
     ambient *= texColor.rgb;
     diffuse *= texColor.rgb;
     specular *= texture(specularTexture, passTexture).rgb;
 
-    // apply shadow: ambient is always present, diffuse and specular are reduced in shadow
-    vec3 directionalColor = min(ambient + (1.0f - shadow) * (diffuse + specular), 1.0f);
-    
-    // Point lights contribution (not affected by shadows)
+    vec3 directionalColor = min(ambient + (1.0 - shadow) * (diffuse + specular), 1.0);
+
     vec3 pointLightContribution = vec3(0.0);
     for (int i = 0; i < numPointLights; i++) {
         vec3 lightDirPoint = normalize(pointLightPos[i] - FragPos);
         float distance = length(pointLightPos[i] - FragPos);
-        
-        // Attenuation pentru point lights
+
         float constant = 1.0;
-        float linear = 0.22;
-        float quadratic = 0.20;
+        float linear = 0.14;
+        float quadratic = 0.07;
         float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
-        
+
         vec3 normalEye = normalize(Normal);
         float diffPoint = max(dot(normalEye, lightDirPoint), 0.0);
-        
-        // Simple point light without specular for simplicity
-        pointLightContribution += diffPoint * pointLightColor[i] * texColor.rgb * attenuation * 1.5;
+        vec3 viewDir = normalize(-fPosEye.xyz);
+        vec3 reflectDir = reflect(-lightDirPoint, normalEye);
+        float specPoint = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
+        vec3 specularPoint = specPoint * pointLightColor[i];
+
+        pointLightContribution += (diffPoint * texColor.rgb + specularPoint) * pointLightColor[i] * attenuation;
     }
-    
+
     vec3 finalColor = directionalColor + pointLightContribution;
 
-    // fog based on distance from camera in eye space
+   
     float distanceToCamera = length(fPosEye.xyz);
     float fogFactor = exp(-fogDensity * distanceToCamera);
-    fogFactor = clamp(fogFactor, 0.0f, 1.0f);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
 
     vec3 colorWithFog = mix(fogColor, finalColor, fogFactor);
-    
+
     fragmentColour = vec4(colorWithFog, texColor.a);
 }
