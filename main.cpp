@@ -103,7 +103,7 @@ ViewMode currentViewMode = VIEW_SOLID;
 
 // Resurse (Laboratorul 8)
 gps::Model3D myModel;
-gps::Model3D lightCube;
+//gps::Model3D lightSphere;  // Schimbăm cubul cu sfera
 gps::Shader myCustomShader;
 gps::Shader depthMapShader;
 gps::Shader lightCubeShader;
@@ -387,7 +387,7 @@ void renderScene(float deltaTime) {
     int numPointLights = (int)pointLightPositions.size();
     glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "numPointLights"), numPointLights);
 
-    for (int i = 0; i < numPointLights && i < 8; i++) {
+   for (int i = 0; i < numPointLights && i < 8; i++) {
         std::string posName = "pointLightPos[" + std::to_string(i) + "]";
         std::string colorName = "pointLightColor[" + std::to_string(i) + "]";
 
@@ -437,18 +437,22 @@ void renderScene(float deltaTime) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     myModel.Draw(myCustomShader);
 
-    // Draw light cube
-    lightCubeShader.useShaderProgram();
-    
+    // Draw light sphere (emissive/glowing)
+   // lightCubeShader.useShaderProgram();
+   /*
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     
     model = lightRotation;
     model = glm::translate(model, 5.0f * lightDir);
-    model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
+    model = glm::scale(model, glm::vec3(0.15f, 0.15f, 0.15f)); // Sferă mai mare
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
     
-    lightCube.Draw(lightCubeShader);
+    // Culoare galbenă intensă pentru efect de lumină
+    glm::vec3 lightSphereColor = glm::vec3(1.0f, 0.9f, 0.6f); // Galben portocaliu strălucitor
+    glUniform3fv(glGetUniformLocation(lightCubeShader.shaderProgram, "objectColor"), 1, glm::value_ptr(lightSphereColor));
+    
+    lightSphere.Draw(lightCubeShader);
 
     // Dimensiune cub pentru felinare
     float lightCubeSize = 0.025f; // cub mic
@@ -458,19 +462,18 @@ void renderScene(float deltaTime) {
 
     // Trimitem view si projection
     glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));*/
 
     for (int i = 0; i < pointLightPositions.size() && i < 8; i++) {
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, pointLightPositions[i]); // pozitia felinarului
-        model = glm::scale(model, glm::vec3(lightCubeSize));  // cub mic
+        //  model = glm::scale(model, glm::vec3(lightCubeSize));  // cub mic
         glUniformMatrix4fv(glGetUniformLocation(lightCubeShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
 
         // culoare galben cald
         glm::vec3 color = pointLightColors[i] * 0.3f; // reduc intensitatea daca vrei mai subtil
         glUniform3fv(glGetUniformLocation(lightCubeShader.shaderProgram, "objectColor"), 1, glm::value_ptr(color));
 
-        lightCube.Draw(lightCubeShader);
     }
 
 }
@@ -516,7 +519,7 @@ int main(int argc, const char* argv[]) {
     // Primul argument: calea catre fisierul .obj
     // Al doilea argument: folderul unde sunt texturile (.png)
     myModel.LoadModel("scene.obj", "./");
-    lightCube.LoadModel("cube.obj", "./");
+    //lightSphere.LoadModel("sphere_light.obj", "./");  // Încărcăm sfera luminată
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 

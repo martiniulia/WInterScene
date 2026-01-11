@@ -162,6 +162,7 @@
     <None Include="shaders\lightCube.vert" />
     <None Include="shaders\lightSource.frag" />
     <None Include="shaders\lightSource.vert" />
+    <None Include="shaders\lightSphere.frag" />
     <None Include="shaders\shaderStart.frag" />
     <None Include="shaders\shaderStart.vert" />
   </ItemGroup>
