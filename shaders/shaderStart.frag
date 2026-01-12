@@ -8,142 +8,101 @@ in vec4 fPosEye;
 
 out vec4 fragmentColour;
 
-//texture
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
+uniform sampler2D shadowMap;
 
-//lighting
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 
-//shadow
-uniform sampler2D shadowMap;
+uniform vec3 pointLightPos[9];
+uniform vec3 pointLightColor[9];
+uniform float pointLightIntensity;
+uniform int numPointLights;
 
-// fog
 uniform vec3 fogColor;
 uniform float fogDensity;
 
-// Smooth vs Solid control
 uniform bool isSmooth;
 
-// Point lights
-uniform vec3 pointLightPos[8];
-uniform vec3 pointLightColor[8];
-uniform int numPointLights;
-
-vec3 ambient;
-float ambientStrength = 0.2f;
-vec3 diffuse;
-vec3 specular;
-float specularStrength = 0.5f;
-float shininess = 32.0f;
-
-float shadow;
+float ambientStrength = 0.2;
+float specularStrength = 0.5;
+float shininess = 32.0;
 
 float computeShadow()
 {
-    // perform perspective divide
     vec3 projCoords = FragPosLightSpace.xyz / FragPosLightSpace.w;
-    
-    // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    
-    // get closest depth value from light's perspective (using [0,1] range FragPosLightSpace as coords)
+
     float closestDepth = texture(shadowMap, projCoords.xy).r;
-    
-    // get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    
-    // check if current fragment is in shadow
-    float bias = 0.010;
-    float shadowFactor = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-    
-    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum
-    if(projCoords.z > 1.0)
-        shadowFactor = 0.0;
-    
-    return shadowFactor;
+
+    float bias = 0.01;
+    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    if (projCoords.z > 1.0) shadow = 0.0;
+
+    return shadow;
 }
 
-void computeLightComponents()
-{    
-    vec3 cameraPosEye = vec3(0.0f);//in eye coordinates, the viewer is situated at the origin
-    
-    //transform normal
-    vec3 normalEye = normalize(Normal);    
-    vec3 normal = isSmooth ? normalEye : normalize(cross(dFdx(FragPos), dFdy(FragPos)));
-    
-    //compute light direction
+vec3 computeSunLight(vec3 normal, vec3 viewDir, vec3 texColor)
+{
     vec3 lightDirN = normalize(lightDir);
-    
-    //compute view direction 
-    vec3 viewDirN = normalize(cameraPosEye - fPosEye.xyz);
-        
-    //compute ambient light
-    ambient = ambientStrength * lightColor;
-    
-    //compute diffuse light - different for smooth vs solid
-    if (isSmooth) {
-        // SMOOTH - full Phong lighting
-        diffuse = max(dot(normal, lightDirN), 0.0f) * lightColor;
-        
-        //compute specular light
-        vec3 reflection = reflect(-lightDirN, normal);
-        float specCoeff = pow(max(dot(viewDirN, reflection), 0.0f), shininess);
-        specular = specularStrength * specCoeff * lightColor;
-    } else {
-        // SOLID - simple flat shading
-        diffuse = max(dot(normal, lightDirN), 0.0f) * lightColor;
-        specular = vec3(0.0f); // No specular for solid mode
+
+    vec3 ambient = ambientStrength * lightColor;
+    vec3 diffuse = max(dot(normal, lightDirN), 0.0) * lightColor;
+
+    vec3 reflection = reflect(-lightDirN, normal);
+    float specCoeff = pow(max(dot(viewDir, reflection), 0.0), shininess);
+    vec3 specular = specularStrength * specCoeff * lightColor;
+
+    float shadow = computeShadow();
+
+    return ambient * texColor +
+           (1.0 - shadow) * (diffuse + specular) * texColor;
+}
+
+vec3 computePointLights(vec3 normal, vec3 fragPos, vec3 texColor)
+{
+    vec3 result = vec3(0.0);
+
+    for (int i = 0; i < numPointLights; i++)
+    {
+        vec3 lightDirP = normalize(pointLightPos[i] - fragPos);
+        float dist = length(pointLightPos[i] - fragPos);
+
+        float constant = 1.0;
+        float linear = 0.09;
+        float quadratic = 0.032;
+        float attenuation = 1.0 /
+            (constant + linear * dist + quadratic * dist * dist);
+
+        float diff = max(dot(normal, lightDirP), 0.0);
+        result += diff * pointLightColor[i] * texColor * attenuation * pointLightIntensity;
     }
-    
-    //compute shadow
-    shadow = computeShadow();
+
+    return result;
 }
 
 void main()
 {
     vec4 texColor = texture(diffuseTexture, passTexture);
-    if (texColor.a < 0.1)
-        discard;
+    if (texColor.a < 0.1) discard;
 
-    computeLightComponents();
-    
-    // Apply texture to lighting components
-    ambient *= texColor.rgb;
-    diffuse *= texColor.rgb;
-    specular *= texture(specularTexture, passTexture).rgb;
+    vec3 normal = isSmooth ? normalize(Normal)
+                           : normalize(cross(dFdx(FragPos), dFdy(FragPos)));
 
-    // apply shadow: ambient is always present, diffuse and specular are reduced in shadow
-    vec3 directionalColor = min(ambient + (1.0f - shadow) * (diffuse + specular), 1.0f);
-    
-    // Point lights contribution (not affected by shadows)
-    vec3 pointLightContribution = vec3(0.0);
-    for (int i = 0; i < numPointLights; i++) {
-        vec3 lightDirPoint = normalize(pointLightPos[i] - FragPos);
-        float distance = length(pointLightPos[i] - FragPos);
-        
-        // Attenuation pentru point lights
-        float constant = 1.0;
-        float linear = 0.22;
-        float quadratic = 0.20;
-        float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
-        
-        vec3 normalEye = normalize(Normal);
-        float diffPoint = max(dot(normalEye, lightDirPoint), 0.0);
-        
-        // Simple point light without specular for simplicity
-        pointLightContribution += diffPoint * pointLightColor[i] * texColor.rgb * attenuation * 1.5;
-    }
-    
-    vec3 finalColor = directionalColor + pointLightContribution;
+    vec3 viewDir = normalize(-fPosEye.xyz);
 
-    // fog based on distance from camera in eye space
-    float distanceToCamera = length(fPosEye.xyz);
-    float fogFactor = exp(-fogDensity * distanceToCamera);
-    fogFactor = clamp(fogFactor, 0.0f, 1.0f);
+    vec3 sunColor = computeSunLight(normal, viewDir, texColor.rgb);
+    vec3 lanternColor = computePointLights(normal, FragPos, texColor.rgb);
 
-    vec3 colorWithFog = mix(fogColor, finalColor, fogFactor);
-    
-    fragmentColour = vec4(colorWithFog, texColor.a);
+    vec3 finalColor = sunColor + lanternColor;
+
+    float dist = length(fPosEye.xyz);
+    float fogFactor = exp(-fogDensity * dist);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+    finalColor = mix(fogColor, finalColor, fogFactor);
+
+    fragmentColour = vec4(finalColor, texColor.a);
 }
