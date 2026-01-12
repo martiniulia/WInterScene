@@ -17,12 +17,22 @@ uniform vec3 lightColor;
 
 uniform vec3 pointLightPos[9];
 uniform vec3 pointLightColor[9];
-uniform float pointLightIntensity;
+uniform float pointLightIntensity = 0.35f;
 uniform int numPointLights;
+
+#define MAX_SPOTLIGHTS 10
+struct SpotLight {
+    vec3 position;
+    vec3 direction;
+    vec3 color;
+    float cutOff;
+    float outerCutOff;
+};
+uniform SpotLight spotLights[MAX_SPOTLIGHTS];
+uniform int numSpotLights;
 
 uniform vec3 fogColor;
 uniform float fogDensity;
-
 uniform bool isSmooth;
 
 float ambientStrength = 0.2;
@@ -57,8 +67,7 @@ vec3 computeSunLight(vec3 normal, vec3 viewDir, vec3 texColor)
 
     float shadow = computeShadow();
 
-    return ambient * texColor +
-           (1.0 - shadow) * (diffuse + specular) * texColor;
+    return ambient * texColor + (1.0 - shadow) * (diffuse + specular) * texColor;
 }
 
 vec3 computePointLights(vec3 normal, vec3 fragPos, vec3 texColor)
@@ -73,11 +82,41 @@ vec3 computePointLights(vec3 normal, vec3 fragPos, vec3 texColor)
         float constant = 1.0;
         float linear = 0.09;
         float quadratic = 0.032;
-        float attenuation = 1.0 /
-            (constant + linear * dist + quadratic * dist * dist);
+        float attenuation = 1.0 / (constant + linear * dist + quadratic * dist * dist);
 
         float diff = max(dot(normal, lightDirP), 0.0);
         result += diff * pointLightColor[i] * texColor * attenuation * pointLightIntensity;
+    }
+
+    return result;
+}
+
+vec3 computeSpotLights(vec3 normal, vec3 fragPos, vec3 viewDir, vec3 texColor)
+{
+    vec3 result = vec3(0.0);
+
+    for(int i = 0; i < numSpotLights; i++)
+    {
+        vec3 lightDirS = normalize(spotLights[i].position - fragPos);
+        float theta = dot(lightDirS, normalize(-spotLights[i].direction));
+        float epsilon = spotLights[i].cutOff - spotLights[i].outerCutOff;
+        float intensity = clamp((theta - spotLights[i].outerCutOff) / epsilon, 0.0, 1.0);
+
+        float dist = length(spotLights[i].position - fragPos);
+        float constant = 1.0;
+        float linear = 0.09;
+        float quadratic = 0.032;
+        float attenuation = 1.0 / (constant + linear * dist + quadratic * dist * dist);
+
+        float diff = max(dot(normal, lightDirS), 0.0);
+        vec3 reflectDir = reflect(-lightDirS, normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+
+        vec3 ambient = ambientStrength * spotLights[i].color;
+        vec3 diffuse = diff * spotLights[i].color;
+        vec3 specular = specularStrength * spec * spotLights[i].color;
+
+        result += (ambient + intensity * (diffuse + specular)) * texColor * attenuation;
     }
 
     return result;
@@ -90,13 +129,13 @@ void main()
 
     vec3 normal = isSmooth ? normalize(Normal)
                            : normalize(cross(dFdx(FragPos), dFdy(FragPos)));
-
     vec3 viewDir = normalize(-fPosEye.xyz);
 
     vec3 sunColor = computeSunLight(normal, viewDir, texColor.rgb);
     vec3 lanternColor = computePointLights(normal, FragPos, texColor.rgb);
+    vec3 spotlightColor = computeSpotLights(normal, FragPos, viewDir, texColor.rgb);
 
-    vec3 finalColor = sunColor + lanternColor;
+    vec3 finalColor = sunColor + lanternColor + spotlightColor;
 
     float dist = length(fPosEye.xyz);
     float fogFactor = exp(-fogDensity * dist);

@@ -46,34 +46,41 @@ gps::Camera myCamera(
     glm::vec3(0.0f, 1.0f, 0.0f)
 );
 
-glm::vec3 spotLightPos(2.7f, 3.5f, 0.13f);   // sus, lângă felinar
-glm::vec3 spotLightDir(0.0f, -1.0f, 0.0f);  // în jos
+//glm::vec3 spotLightPos(2.7f, 3.5f, 0.13f);   // sus, lângă felinar
+//glm::vec3 spotLightDir(0.0f, -1.0f, 0.0f);  // în jos
 
-// Coordonate felinare din Blender
+// ---------- POINT LIGHTS (felinare mici) ----------
 std::vector<glm::vec3> pointLightPositions = {
     {2.22f, 0.42f, 2.72f},   // felinar 1
     {2.50f, 0.42f, 2.66f},   // felinar 2
     {2.43f, 0.10f, 3.57f},   // felinar 3
     {2.71f, 0.11f, 3.57f},   // felinar 4
     {2.00f, 0.10f, 1.88f},   // felinar 5
-    {2.28f, 0.10f, 1.81f},
-    {6.1f, 0.35f, 1.4f},
-    {6.8f, 0.32f, 0.82f},
-    {5.2f, 0.32f, 1.93f}
+    {2.28f, 0.10f, 1.81f}    // felinar 6
 };
 
-// Culori felinare (cald, portocaliu/galben)
 std::vector<glm::vec3> pointLightColors = {
     {1.0f, 0.75f, 0.4f},
     {1.0f, 0.75f, 0.4f},
     {1.0f, 0.75f, 0.4f},
     {1.0f, 0.75f, 0.4f},
     {1.0f, 0.75f, 0.4f},
-    {1.0f, 0.75f, 0.4f},
-    {1.0f, 0.75f, 0.4f},
-    {1.0f, 0.75f, 0.4f},
     {1.0f, 0.75f, 0.4f}
-    
+};
+
+// ---------- SPOTLIGHTS (felinare mari) ----------
+struct SpotLight {
+    glm::vec3 position;
+    glm::vec3 direction;
+    glm::vec3 color;
+    float cutOff;
+    float outerCutOff;
+};
+
+std::vector<SpotLight> spotLights = {
+    { {6.1f, 0.35f, 1.4f}, glm::vec3(0.0f, -1.0f, 0.0f), {1.0f, 0.75f, 0.4f}, glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)) },
+    { {6.8f, 0.32f, 0.82f}, glm::vec3(0.0f, -1.0f, 0.0f), {1.0f, 0.75f, 0.4f}, glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)) },
+    { {5.2f, 0.32f, 1.93f}, glm::vec3(0.0f, -1.0f, 0.0f), {1.0f, 0.75f, 0.4f}, glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)) }
 };
 
 float cameraSpeed = 3.0f;
@@ -389,133 +396,72 @@ void renderScene(float deltaTime)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     myCustomShader.useShaderProgram();
-    glUniform1f(
-        glGetUniformLocation(myCustomShader.shaderProgram, "pointLightIntensity"),
-        0.35f
-    );
 
     view = myCamera.getViewMatrix();
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-    glUniform1f(
-        glGetUniformLocation(myCustomShader.shaderProgram, "fogDensity"),
-        fogDensity
-    );
-    glUniform3fv(
-        glGetUniformLocation(myCustomShader.shaderProgram, "fogColor"),
-        1, glm::value_ptr(fogColor)
-    );
+    // Fog
+    glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, "fogDensity"), fogDensity);
+    glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "fogColor"), 1, glm::value_ptr(fogColor));
 
-    glUniform1i(
-        glGetUniformLocation(myCustomShader.shaderProgram, "isSmooth"),
-        currentViewMode == VIEW_SMOOTH
-    );
+    glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "isSmooth"), currentViewMode == VIEW_SMOOTH);
 
     /* ---------- Sun (Directional Light) ---------- */
     glm::vec3 sunBaseDir(0.0f, 1.0f, 1.0f);
-    glm::mat4 sunRotation = glm::rotate(
-        glm::mat4(1.0f),
-        glm::radians(lightAngle),
-        glm::vec3(0.0f, 1.0f, 0.0f)
-    );
+    glm::mat4 sunRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::vec3 sunDirWorld = glm::vec3(sunRotation * glm::vec4(sunBaseDir, 0.0f));
 
-    glUniform3fv(
-        glGetUniformLocation(myCustomShader.shaderProgram, "lightDir"),
-        1, glm::value_ptr(sunDirWorld)
-    );
-
+    glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightDir"), 1, glm::value_ptr(sunDirWorld));
     glm::vec3 sunColor(1.0f, 1.0f, 1.0f);
-    glUniform3fv(
-        glGetUniformLocation(myCustomShader.shaderProgram, "lightColor"),
-        1, glm::value_ptr(sunColor)
-    );
+    glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightColor"), 1, glm::value_ptr(sunColor));
 
-    /* ---------- Point Lights ---------- */
+    /* ---------- Point Lights (felinare mici) ---------- */
     int numPointLights = (int)pointLightPositions.size();
-    glUniform1i(
-        glGetUniformLocation(myCustomShader.shaderProgram, "numPointLights"),
-        numPointLights
-    );
+    glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "numPointLights"), numPointLights);
 
     for (int i = 0; i < numPointLights; i++)
     {
         std::string posName = "pointLightPos[" + std::to_string(i) + "]";
         std::string colName = "pointLightColor[" + std::to_string(i) + "]";
 
-        glUniform3fv(
-            glGetUniformLocation(myCustomShader.shaderProgram, posName.c_str()),
-            1, glm::value_ptr(pointLightPositions[i])
-        );
-        glUniform3fv(
-            glGetUniformLocation(myCustomShader.shaderProgram, colName.c_str()),
-            1, glm::value_ptr(pointLightColors[i])
-        );
+        glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, posName.c_str()), 1, glm::value_ptr(pointLightPositions[i]));
+        glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, colName.c_str()), 1, glm::value_ptr(pointLightColors[i]));
+    }
 
+    /* ---------- Spotlights (felinare mari) ---------- */
+    int numSpotLights = (int)spotLights.size();
+    glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "numSpotLights"), numSpotLights);
+
+    for (int i = 0; i < numSpotLights; i++)
+    {
+        std::string base = "spotLights[" + std::to_string(i) + "]";
+
+        glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".position").c_str()), 1, glm::value_ptr(spotLights[i].position));
+        glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".direction").c_str()), 1, glm::value_ptr(spotLights[i].direction));
+        glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".color").c_str()), 1, glm::value_ptr(spotLights[i].color));
+        glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".cutOff").c_str()), spotLights[i].cutOff);
+        glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".outerCutOff").c_str()), spotLights[i].outerCutOff);
     }
 
     /* ---------- Shadow Map ---------- */
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, depthMapTexture);
-    glUniform1i(
-        glGetUniformLocation(myCustomShader.shaderProgram, "shadowMap"),
-        1
-    );
-    glUniformMatrix4fv(
-        glGetUniformLocation(myCustomShader.shaderProgram, "lightSpaceTrMatrix"),
-        1, GL_FALSE, glm::value_ptr(lightSpaceTrMatrix)
-    );
+    glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "shadowMap"), 1);
+    glUniformMatrix4fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightSpaceTrMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceTrMatrix));
 
     /* ---------- Main Model ---------- */
     model = glm::mat4(1.0f);
     model = glm::translate(model, objectTranslate);
-    model = glm::rotate(model, glm::radians(angle + objectRotation),
-        glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(angle + objectRotation), glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::scale(model, glm::vec3(objectScale));
 
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
     glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(view * model));
-    glUniformMatrix3fv(
-        glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix"),
-        1, GL_FALSE, glm::value_ptr(normalMatrix)
-    );
+    glUniformMatrix3fv(glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
 
     myModel.Draw(myCustomShader);
-
-    ///* ==============================
-    //   3. EMISSIVE SPHERES
-    //   ============================== */
-    //lightCubeShader.useShaderProgram();
-
-    //glUniformMatrix4fv(
-    //    glGetUniformLocation(lightCubeShader.shaderProgram, "view"),
-    //    1, GL_FALSE, glm::value_ptr(view)
-    //);
-    //glUniformMatrix4fv(
-    //    glGetUniformLocation(lightCubeShader.shaderProgram, "projection"),
-    //    1, GL_FALSE, glm::value_ptr(projection)
-    //);
-
-    //for (int i = 0; i < numPointLights; i++)
-    //{
-    //    glm::mat4 sphereModel = glm::mat4(1.0f);
-    //    sphereModel = glm::translate(sphereModel, pointLightPositions[i]);
-    //    sphereModel = glm::scale(sphereModel, glm::vec3(0.05f));
-
-    //    glUniformMatrix4fv(
-    //        glGetUniformLocation(lightCubeShader.shaderProgram, "model"),
-    //        1, GL_FALSE, glm::value_ptr(sphereModel)
-    //    );
-    //    glUniform3fv(
-    //        glGetUniformLocation(lightCubeShader.shaderProgram, "objectColor"),
-    //        1, glm::value_ptr(pointLightColors[i])
-    //    );
-
-    //    sphere.Draw(lightCubeShader);
-    //}
 }
-
 
 void cleanup() {
     glDeleteTextures(1, &depthMapTexture);
