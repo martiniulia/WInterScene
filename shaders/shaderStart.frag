@@ -17,7 +17,7 @@ uniform vec3 lightColor;
 
 uniform vec3 pointLightPos[9];
 uniform vec3 pointLightColor[9];
-uniform float pointLightIntensity = 0.35f;
+uniform float pointLightIntensity = 0.45f;
 uniform int numPointLights;
 
 #define MAX_SPOTLIGHTS 10
@@ -33,7 +33,7 @@ uniform int numSpotLights;
 
 uniform vec3 fogColor;
 uniform float fogDensity;
-uniform bool isSmooth;
+uniform int isSmooth;
 
 float ambientStrength = 0.2;
 float specularStrength = 0.5;
@@ -127,10 +127,14 @@ void main()
     vec4 texColor = texture(diffuseTexture, passTexture);
     if (texColor.a < 0.1) discard;
 
-    vec3 normal = isSmooth ? normalize(Normal)
-                           : normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+    vec3 normal;
+    if (isSmooth == 1) {
+        normal = normalize(Normal);
+    } else {
+        normal = normalize(cross(dFdx(FragPos), dFdy(FragPos)));
+    }
+    
     vec3 viewDir = normalize(-fPosEye.xyz);
-
     vec3 sunColor = computeSunLight(normal, viewDir, texColor.rgb);
     vec3 lanternColor = computePointLights(normal, FragPos, texColor.rgb);
     vec3 spotlightColor = computeSpotLights(normal, FragPos, viewDir, texColor.rgb);
@@ -140,7 +144,6 @@ void main()
     float dist = length(fPosEye.xyz);
     float fogFactor = exp(-fogDensity * dist);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-
     finalColor = mix(fogColor, finalColor, fogFactor);
 
     fragmentColour = vec4(finalColor, texColor.a);

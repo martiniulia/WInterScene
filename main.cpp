@@ -1,4 +1,4 @@
-﻿#if defined (_APPLE_)
+﻿#if defined (APPLE)
 #define GLFW_INCLUDE_GLCOREARB
 #else
 #define GLEW_STATIC
@@ -18,13 +18,11 @@
 #include "Camera.hpp"
 #include "Model3D.hpp"
 
-// Dimensiuni fereastra
-int glWindowWidth = 1024;
-int glWindowHeight = 768;
+int glWindowWidth = 12004;
+int glWindowHeight = 700;
 int retina_width, retina_height;
 GLFWwindow* glWindow = NULL;
 
-// Matrici si locatii
 glm::mat4 model;
 GLint modelLoc;
 glm::mat4 view;
@@ -46,17 +44,13 @@ gps::Camera myCamera(
     glm::vec3(0.0f, 1.0f, 0.0f)
 );
 
-//glm::vec3 spotLightPos(2.7f, 3.5f, 0.13f);   // sus, lângă felinar
-//glm::vec3 spotLightDir(0.0f, -1.0f, 0.0f);  // în jos
-
-// ---------- POINT LIGHTS (felinare mici) ----------
 std::vector<glm::vec3> pointLightPositions = {
-    {2.22f, 0.42f, 2.72f},   // felinar 1
-    {2.50f, 0.42f, 2.66f},   // felinar 2
-    {2.43f, 0.10f, 3.57f},   // felinar 3
-    {2.71f, 0.11f, 3.57f},   // felinar 4
-    {2.00f, 0.10f, 1.88f},   // felinar 5
-    {2.28f, 0.10f, 1.81f}    // felinar 6
+    {2.22f, 0.42f, 2.72f},
+    {2.50f, 0.42f, 2.66f},
+    {2.43f, 0.10f, 3.57f},
+    {2.71f, 0.11f, 3.57f},
+    {2.00f, 0.10f, 1.88f},
+    {2.28f, 0.10f, 1.81f}
 };
 
 std::vector<glm::vec3> pointLightColors = {
@@ -68,7 +62,6 @@ std::vector<glm::vec3> pointLightColors = {
     {1.0f, 0.75f, 0.4f}
 };
 
-// ---------- SPOTLIGHTS (felinare mari) ----------
 struct SpotLight {
     glm::vec3 position;
     glm::vec3 direction;
@@ -85,23 +78,16 @@ std::vector<SpotLight> spotLights = {
 
 float cameraSpeed = 3.0f;
 
-// Input
 bool pressedKeys[1024];
 float angle = 0.0f;
+float dragonRotation = 0.0f;
 
-// View modes
-int viewMode = 0; // 0 = FILL, 1 = WIREFRAME, 2 = SMOOTH
+int viewMode = 0;
 
-// Object transformations
 float objectScale = 1.0f;
 glm::vec3 objectTranslate(0.0f, 0.0f, 0.0f);
 float objectRotation = 0.0f;
 
-// Animation
-float animationTime = 0.0f;
-float doorRotation = 0.0f; // Pentru animație ușă (exemplu)
-
-// Light rotation
 float lightAngle = 0.0f;
 
 enum ViewMode {
@@ -115,23 +101,21 @@ ViewMode currentViewMode = VIEW_SOLID;
 
 // Resurse (Laboratorul 8)
 gps::Model3D myModel;
-gps::Model3D sphere;
-//gps::Model3D lightSphere;  // Schimbăm cubul cu sfera
+gps::Model3D dragonModel;
+
 gps::Shader myCustomShader;
 gps::Shader depthMapShader;
 gps::Shader lightCubeShader;
 gps::Shader lightGlowShader;
 
-// Shadow mapping
 const unsigned int SHADOW_WIDTH = 2048;
 const unsigned int SHADOW_HEIGHT = 2048;
 GLuint shadowMapFBO;
 GLuint depthMapTexture;
 glm::mat4 lightSpaceTrMatrix;
 
-// Fog parameters
-float fogDensity = 0.035f; // Mărit pentru vizibilitate mai bună
-glm::vec3 fogColor(0.75f, 0.8f, 0.85f); // Culoare ceață ușoară
+float fogDensity = 0.045f;
+glm::vec3 fogColor(0.75f, 0.8f, 0.85f);
 
 void windowResizeCallback(GLFWwindow* window, int width, int height) {
     fprintf(stdout, "window resized to width: %d , and height: %d\n", width, height);
@@ -166,7 +150,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // inversat (ecran vs OpenGL)
+    float yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
@@ -177,7 +161,6 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
     yaw += xoffset;
     pitch += yoffset;
 
-    // limitare pitch (fara flip)
     if (pitch > 89.0f)
         pitch = 89.0f;
     if (pitch < -89.0f)
@@ -189,7 +172,6 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 void processMovement(float deltaTime) {
     float speed = cameraSpeed * deltaTime;
 
-    // View modes: V = SOLID, M = WIREFRAME, N = POLYGONAL, B = SMOOTH
     if (pressedKeys[GLFW_KEY_V]) {
         currentViewMode = VIEW_SOLID;
     }
@@ -203,7 +185,6 @@ void processMovement(float deltaTime) {
         currentViewMode = VIEW_SMOOTH;
     }
 
-    // Apply current view mode
     switch (currentViewMode) {
     case VIEW_SOLID:
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -221,30 +202,21 @@ void processMovement(float deltaTime) {
         break;
     }
 
-    // Scene rotation
     if (pressedKeys[GLFW_KEY_Q]) {
-        angle += 1.0f;
+        dragonRotation += 1.0f;
     }
     if (pressedKeys[GLFW_KEY_E]) {
-        angle -= 1.0f;
-    }
-
-    // Object transformations (exemplu - poți ajusta tastele)
-    if (pressedKeys[GLFW_KEY_R]) {
-        objectRotation += 1.0f;
-    }
-    if (pressedKeys[GLFW_KEY_T]) {
-        objectRotation -= 1.0f;
+        dragonRotation -= 1.0f;
     }
     if (pressedKeys[GLFW_KEY_U]) {
         objectScale += 0.01f;
         objectScale = glm::min(objectScale, 2.0f);
     }
     if (pressedKeys[GLFW_KEY_J]) {
-        lightAngle += 1.0f; // Rotate light left
+        lightAngle += 1.0f;
     }
     if (pressedKeys[GLFW_KEY_L]) {
-        lightAngle -= 1.0f; // Rotate light right
+        lightAngle -= 1.0f;
     }
     if (pressedKeys[GLFW_KEY_W]) {
         myCamera.move(gps::MOVE_FORWARD, speed);
@@ -281,7 +253,11 @@ bool initOpenGLWindow() {
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    glWindow = glfwCreateWindow(glWindowWidth, glWindowHeight, "Proiect OpenGL - Scena Iarna", NULL, NULL);
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+    glWindow = glfwCreateWindow(mode->width, mode->height, "Project - Frozen", primaryMonitor, NULL);
+
 
     if (!glWindow) {
         fprintf(stderr, "ERROR: could not open window with GLFW3\n");
@@ -298,7 +274,7 @@ bool initOpenGLWindow() {
 
     glfwSwapInterval(1);
 
-#if !defined (_APPLE_)
+#if !defined (APPLE)
     glewExperimental = GL_TRUE;
     glewInit();
 #endif
@@ -314,10 +290,8 @@ bool initOpenGLWindow() {
 }
 
 void initFBO() {
-    // Create FBO for shadow mapping
     glGenFramebuffers(1, &shadowMapFBO);
 
-    // Create depth texture
     glGenTextures(1, &depthMapTexture);
     glBindTexture(GL_TEXTURE_2D, depthMapTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
@@ -331,7 +305,6 @@ void initFBO() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
-    // Attach texture to FBO
     glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMapTexture, 0);
 
@@ -342,12 +315,12 @@ void initFBO() {
 }
 
 glm::mat4 computeLightSpaceTrMatrix() {
-    // Ca in lab9 - folosim rotirea luminii
+    // Ca in lab9
     glm::vec3 lightDir = glm::vec3(0.0f, 1.0f, 1.0f);
     glm::mat4 lightRotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::vec3 rotatedLightDir = glm::vec3(lightRotationMatrix * glm::vec4(lightDir, 0.0f));
 
-    glm::vec3 lightPos = rotatedLightDir; // Pozitionam lumina undeva pe directie
+    glm::vec3 lightPos = rotatedLightDir;
     glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -358,10 +331,7 @@ glm::mat4 computeLightSpaceTrMatrix() {
 }
 
 void renderScene(float deltaTime)
-{
-    /* ==============================
-       1. DEPTH MAP PASS
-       ============================== */
+{  //depth map
     depthMapShader.useShaderProgram();
 
     lightSpaceTrMatrix = computeLightSpaceTrMatrix();
@@ -388,9 +358,7 @@ void renderScene(float deltaTime)
     myModel.Draw(depthMapShader);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    /* ==============================
-       2. FINAL SCENE PASS
-       ============================== */
+    //final scene
     glViewport(0, 0, retina_width, retina_height);
     glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -403,19 +371,18 @@ void renderScene(float deltaTime)
     // Fog
     glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, "fogDensity"), fogDensity);
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "fogColor"), 1, glm::value_ptr(fogColor));
-
     glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "isSmooth"), currentViewMode == VIEW_SMOOTH);
 
-    /* ---------- Sun (Directional Light) ---------- */
+    // sun
     glm::vec3 sunBaseDir(0.0f, 1.0f, 1.0f);
     glm::mat4 sunRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::vec3 sunDirWorld = glm::vec3(sunRotation * glm::vec4(sunBaseDir, 0.0f));
 
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightDir"), 1, glm::value_ptr(sunDirWorld));
-    glm::vec3 sunColor(1.0f, 1.0f, 1.0f);
+    glm::vec3 sunColor(0.3f, 0.3f, 0.3f);
     glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightColor"), 1, glm::value_ptr(sunColor));
 
-    /* ---------- Point Lights (felinare mici) ---------- */
+    // felinare mici
     int numPointLights = (int)pointLightPositions.size();
     glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "numPointLights"), numPointLights);
 
@@ -423,19 +390,17 @@ void renderScene(float deltaTime)
     {
         std::string posName = "pointLightPos[" + std::to_string(i) + "]";
         std::string colName = "pointLightColor[" + std::to_string(i) + "]";
-
         glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, posName.c_str()), 1, glm::value_ptr(pointLightPositions[i]));
         glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, colName.c_str()), 1, glm::value_ptr(pointLightColors[i]));
     }
 
-    /* ---------- Spotlights (felinare mari) ---------- */
+    //felinare mari
     int numSpotLights = (int)spotLights.size();
     glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "numSpotLights"), numSpotLights);
 
     for (int i = 0; i < numSpotLights; i++)
     {
         std::string base = "spotLights[" + std::to_string(i) + "]";
-
         glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".position").c_str()), 1, glm::value_ptr(spotLights[i].position));
         glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".direction").c_str()), 1, glm::value_ptr(spotLights[i].direction));
         glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".color").c_str()), 1, glm::value_ptr(spotLights[i].color));
@@ -443,13 +408,13 @@ void renderScene(float deltaTime)
         glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".outerCutOff").c_str()), spotLights[i].outerCutOff);
     }
 
-    /* ---------- Shadow Map ---------- */
+    //shadow map
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, depthMapTexture);
     glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "shadowMap"), 1);
     glUniformMatrix4fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightSpaceTrMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceTrMatrix));
 
-    /* ---------- Main Model ---------- */
+    // main model
     model = glm::mat4(1.0f);
     model = glm::translate(model, objectTranslate);
     model = glm::rotate(model, glm::radians(angle + objectRotation), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -461,6 +426,24 @@ void renderScene(float deltaTime)
     glUniformMatrix3fv(glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalMatrix));
 
     myModel.Draw(myCustomShader);
+    float dragonAnimTime = glfwGetTime();
+
+    float bobHeight = 0.1f * sin(dragonAnimTime * 2.0f); 
+    float sway = 0.05f * sin(dragonAnimTime * 3.0f);
+    float bodyRotation = 5.0f * sin(dragonAnimTime * 1.5f); 
+
+    glm::mat4 dragonMatrix = glm::mat4(1.0f);
+    dragonMatrix = glm::rotate(dragonMatrix, glm::radians(dragonRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    dragonMatrix = glm::translate(dragonMatrix, glm::vec3(1.5f + sway, 2.0f + bobHeight, 0.5f));
+    dragonMatrix = glm::rotate(dragonMatrix, glm::radians(bodyRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    dragonMatrix = glm::scale(dragonMatrix, glm::vec3(0.5f));
+
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(dragonMatrix));
+    glm::mat3 dragonNormalMatrix = glm::mat3(glm::inverseTranspose(view * dragonMatrix));
+    glUniformMatrix3fv(glGetUniformLocation(myCustomShader.shaderProgram, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(dragonNormalMatrix));
+
+    dragonModel.Draw(myCustomShader);
+
 }
 
 void cleanup() {
@@ -499,12 +482,9 @@ int main(int argc, const char* argv[]) {
 
     // Initialize FBO for shadow mapping
     initFBO();
-    // INCARCARE MODEL FINAL (Exportul tau din Blender)
-    // Primul argument: calea catre fisierul .obj
-    // Al doilea argument: folderul unde sunt texturile (.png)
     myModel.LoadModel("scene.obj", "./");
-    sphere.LoadModel("sphere.obj");
-    //lightSphere.LoadModel("sphere_light.obj", "./");  // Încărcăm sfera luminată
+    dragonModel.LoadModel("dragon.obj", "./");
+    
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
